@@ -518,6 +518,9 @@ static xdebug_str* return_file_source(zend_string *filename, int begin, int end)
 	char  *line = NULL;
 	xdebug_str *source = xdebug_str_new();
 	char *tmp_filename = NULL;
+#ifndef WIN32
+	php_stream_statbuf ssb = {0};
+#endif
 
 	if (i < 0) {
 		begin = 0;
@@ -531,10 +534,23 @@ static xdebug_str* return_file_source(zend_string *filename, int begin, int end)
 			NULL);
 	xdfree(tmp_filename);
 
-	/* Read until the "begin" line has been read */
+	/* If we couldn't open the stream, bail out */
 	if (!stream) {
 		return NULL;
 	}
+
+#ifndef WIN32
+	/* Check what we're dealing with */
+	if (php_stream_stat(stream, &ssb) != 0) {
+		php_stream_close(stream);
+		return NULL;
+	}
+	/* If it's a directory, bail out */
+	if (S_ISDIR(ssb.sb.st_mode)) {
+		php_stream_close(stream);
+		return NULL;
+	}
+#endif
 
 	/* skip to the first requested line */
 	while (i > 0 && !php_stream_eof(stream)) {
@@ -1517,6 +1533,11 @@ DBGP_FUNC(feature_get)
 			xdebug_xml_add_attribute(*retval, "supported", "1");
 		XDEBUG_STR_CASE_END
 
+		XDEBUG_STR_CASE("multiple_sessions")
+			xdebug_xml_add_text(*retval, xdstrdup("0"));
+			xdebug_xml_add_attribute(*retval, "supported", "1");
+		XDEBUG_STR_CASE_END
+
 		XDEBUG_STR_CASE("language_version")
 			xdebug_xml_add_text(*retval, xdstrdup(XG_BASE(php_version_run_time)));
 			xdebug_xml_add_attribute(*retval, "supported", "1");
@@ -1641,10 +1662,6 @@ DBGP_FUNC(feature_set)
 
 		XDEBUG_STR_CASE("show_hidden")
 			options->show_hidden = strtol(CMD_OPTION_CHAR('v'), NULL, 10);
-		XDEBUG_STR_CASE_END
-
-		XDEBUG_STR_CASE("multiple_sessions")
-			/* FIXME: Add new boolean option check / struct field for this */
 		XDEBUG_STR_CASE_END
 
 		XDEBUG_STR_CASE("extended_properties")
@@ -2433,7 +2450,8 @@ static int xdebug_dbgp_parse_option(xdebug_con *context, char* line, int flags, 
 /*****************************************************************************
 ** Handlers for debug functions
 */
-#define READ_BUFFER_SIZE 128
+#define DBGP_READ_BUFFER_SIZE 128
+#define DBGP_MAX_PACKET_SIZE (64 * 1024)
 
 #define FD_RL_FILE    0
 #define FD_RL_SOCKET  1
@@ -2445,7 +2463,7 @@ static char* xdebug_fd_read_line_delim(int socketfd, fd_buf *context, int type, 
 	char *tmp;
 	char *tmp_buf = NULL;
 	char *ptr;
-	char buffer[READ_BUFFER_SIZE + 1];
+	char buffer[DBGP_READ_BUFFER_SIZE + 1];
 
 	if (!context->buffer) {
 		context->buffer = calloc(1,1);
@@ -2455,12 +2473,33 @@ static char* xdebug_fd_read_line_delim(int socketfd, fd_buf *context, int type, 
 	while (context->buffer_size < 1 || context->buffer[context->buffer_size - 1] != delim) {
 		ptr = context->buffer + context->buffer_size;
 		if (type == FD_RL_FILE) {
-			newl = read(socketfd, buffer, READ_BUFFER_SIZE);
+			newl = read(socketfd, buffer, DBGP_READ_BUFFER_SIZE);
 		} else {
-			newl = recv(socketfd, buffer, READ_BUFFER_SIZE, 0);
+			newl = recv(socketfd, buffer, DBGP_READ_BUFFER_SIZE, 0);
 		}
 		if (newl > 0) {
-			context->buffer = realloc(context->buffer, context->buffer_size + newl + 1);
+			char *new_buffer = NULL;
+
+			/* Reallocating to accomodate more data will exceed max packet size */
+			if (context->buffer_size + newl + 1 > DBGP_MAX_PACKET_SIZE) {
+				free(context->buffer);
+				context->buffer = NULL;
+				context->buffer_size = 0;
+				return NULL;
+			}
+
+			new_buffer = realloc(context->buffer, context->buffer_size + newl + 1);
+
+			/* If we run out of memory, abort */
+			if (!new_buffer) {
+				free(context->buffer);
+				context->buffer = NULL;
+				context->buffer_size = 0;
+				return NULL;
+			}
+
+			/* Copy new data into the newly allocated buffer */
+			context->buffer = new_buffer;
 			memcpy(context->buffer + context->buffer_size, buffer, newl);
 			context->buffer_size += newl;
 			context->buffer[context->buffer_size] = '\0';
@@ -2481,7 +2520,7 @@ static char* xdebug_fd_read_line_delim(int socketfd, fd_buf *context, int type, 
 	tmp[size] = '\0';
 	memcpy(tmp, context->buffer, size);
 	/* Rewrite existing buffer */
-	if ((nbufsize = context->buffer_size - size - 1)  > 0) {
+	if ((nbufsize = context->buffer_size - size - 1) > 0) {
 		tmp_buf = malloc(nbufsize + 1);
 		memcpy(tmp_buf, ptr + 1, nbufsize);
 		tmp_buf[nbufsize] = 0;

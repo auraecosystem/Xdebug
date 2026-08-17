@@ -271,7 +271,7 @@ char *xdebug_path_from_url(zend_string *fileurl)
 
 	if (tmp) {
 		fp = tmp + 7;
-		if (fp[0] == '/' && fp[2] == ':') {
+		if (fp[0] == '/' && fp[1] != '\0' && fp[2] == ':') {
 			fp++;
 		}
 		ret = xdstrdup(fp);
@@ -429,7 +429,7 @@ FILE *xdebug_fopen(char *fname, const char *mode, const char *extension, char **
 	} else {
 		tmp_fname = xdstrdup(fname);
 	}
-	r = stat(tmp_fname, &buf);
+	r = lstat(tmp_fname, &buf);
 	/* We're not freeing "tmp_fname" as that is used in the freopen as well. */
 
 	if (r == -1) {
@@ -438,10 +438,16 @@ FILE *xdebug_fopen(char *fname, const char *mode, const char *extension, char **
 		goto lock;
 	}
 
-	/* 3. It exists, check if we can open it. */
+	/* 3. If the file exists, but is a symlink, we need to not follow it, and instead create a new file */
+	if (S_ISLNK(buf.st_mode)) {
+		fh = xdebug_open_file_with_random_ext(fname, "w", extension, new_fname);
+		goto lock;
+	}
+
+	/* 4. It exists, check if we can open it. */
 	fh = xdebug_open_file(fname, "r+", extension, new_fname);
 	if (!fh) {
-		/* 4. If fh == null we couldn't even open the file, so open a new one with a new name */
+		/* If fh == null we couldn't even open the file, so open a new one with a new name */
 		fh = xdebug_open_file_with_random_ext(fname, "w", extension, new_fname);
 		goto lock;
 	}
@@ -616,6 +622,11 @@ int xdebug_format_output_filename(char **filename, char *format, char *script_na
 				case '%': /* literal % */
 					xdebug_str_addc(&fname, '%');
 					break;
+
+				case '\0': /* trailing % */
+					xdebug_str_addc(&fname, '%');
+					format--;
+					break;
 			}
 		}
 		format++;
@@ -649,6 +660,11 @@ int xdebug_format_file_link(char **filename, const char *error_filename, int err
 
 				case '%': /* literal % */
 					xdebug_str_addc(&fname, '%');
+					break;
+
+				case '\0': /* trailing % */
+					xdebug_str_addc(&fname, '%');
+					format--;
 					break;
 			}
 		}
@@ -707,6 +723,11 @@ int xdebug_format_filename(char **formatted_name, const char *default_fmt, zend_
 					break;
 				case '%': /* literal % */
 					xdebug_str_addc(&fname, '%');
+					break;
+
+				case '\0': /* trailing % */
+					xdebug_str_addc(&fname, '%');
+					format--;
 					break;
 			}
 		}
