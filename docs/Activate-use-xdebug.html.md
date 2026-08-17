@@ -1,28 +1,15 @@
-<!doctype html>
-<html lang="en">
-  <head>
+<head>
     <meta charset="utf-8">
     <!-- Always force latest IE rendering engine or request Chrome Frame -->
     <meta content="IE=edge,chrome=1" http-equiv="X-UA-Compatible">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <!-- Use title if it's in the page YAML frontmatter -->
-    <title>Activate and Use Xdebug</title>
-
-    
-    
-
+    <!-- Use title if it's in the page YAML frontmatter --
+  <title>Activate and Use Xdebug</title>
     <link href="/dashboard/stylesheets/normalize.css" rel="stylesheet" type="text/css" /><link href="/dashboard/stylesheets/all.css" rel="stylesheet" type="text/css" />
     <link href="//cdnjs.cloudflare.com/ajax/libs/font-awesome/3.1.0/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
-
     <script src="/dashboard/javascripts/modernizr.js" type="text/javascript"></script>
-
-
     <link href="/dashboard/images/favicon.png" rel="icon" type="image/png" />
-
-
   </head>
-
   <body class="docs docs_activate-use-xdebug">
     <div id="fb-root"></div>
     <script>(function(d, s, id) {
@@ -56,7 +43,6 @@
         </section>
       </nav>
     </header>
-
     <div class="wrapper">
       <div class="hero">
   <div class="row">
