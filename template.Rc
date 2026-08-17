@@ -3,7 +3,6 @@
 #ifdef APSTUDIO_INVOKED
 # error dont edit with MSVC
 #endif
-
 #include "winres.h"
 #include "main/php_version.h"
 
@@ -40,7 +39,7 @@ BEGIN
             VALUE "FileDescription", FILE_DESCRIPTION "\0"
             VALUE "FileVersion", VERSIONSTR
             VALUE "InternalName", FILE_NAME "\0"
-            VALUE "LegalCopyright", "Copyright © 2002-2025 Derick Rethans\0"
+            VALUE "LegalCopyright", "Copyright Â© 2002-2025 Derick Rethans\0"
             VALUE "OriginalFilename", FILE_NAME "\0"
             VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "Xdebug\0"
